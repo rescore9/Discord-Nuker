@@ -165,6 +165,7 @@ async def on_ready():
     await bot.tree.sync()
     print(Colorate.Horizontal(Colors.blue_to_cyan, aascii, 1))
     print(f"Logged in as {bot.user}")
+    print("Restart Your Discord To see as the new slash commands!")
 
 if __name__ == "__main__":
     try:
